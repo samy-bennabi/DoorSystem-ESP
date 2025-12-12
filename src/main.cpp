@@ -1,10 +1,10 @@
+#include <Arduino.h>
 #include <SPI.h>
 #include <MFRC522.h>
+#include <HTTPClient.h>
 
 #include "myWiFi.h"
-#include "myHttp.h"
 #include "myMqtt.h"
-#include "myRfid.h"
 #define RELAY_PIN 15 // pin for relay
 #define RST_PIN 39 // Reset pin
 #define SS_PIN 5  // Slave select pin
@@ -32,6 +32,8 @@ const char *mqtt_id         = "ESP32";
 const char *mqtt_user       = "user";
 const char *mqtt_password   = "Patate123";
 const char *mqtt_door_open  = "DoorSystem/door/open";
+const char *mqtt_card_add   = "Doorsystem/card/add";
+const char *mqtt_access_add = "Doorsystem/access/add";
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 HTTPClient client;
@@ -39,6 +41,7 @@ HTTPClient client;
 String rfidCard = "";
 
 String readRfidCard();
+void sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2);
 
 //MyRfid rfid(SS_PIN, RST_PIN);
 MyWiFi wifi;
