@@ -34,6 +34,7 @@ const char *mqtt_password   = "Patate123";
 const char *mqtt_door_open  = "DoorSystem/door/open";
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
+HTTPClient client;
 
 String rfidCard = "";
 
@@ -41,7 +42,6 @@ String readRfidCard();
 
 //MyRfid rfid(SS_PIN, RST_PIN);
 MyWiFi wifi;
-MyHttp http(apiServer, apiPort);
 MyMqtt mqtt(mqttServer, mqttPort, mqtt_id, "", "", doorName);
 
 void setup(){
@@ -86,9 +86,9 @@ void loop(){
     Serial.print("UID tag: ");
     Serial.println(rfidCard);
     
-    if(mqtt.addCard==0 & mqtt.addAccess==0){ http.sendPostReq(api_access_check, "cardUid", rfidCard.c_str(), "doorName", doorName); }
-    if(mqtt.addCard > 0){ http.sendPostReq(api_card_add, "uid", rfidCard.c_str(), "doorName", doorName); }
-    if(mqtt.addAccess > 0){ http.sendPostReq(api_access_add, "cardUid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addCard==0 & mqtt.addAccess==0){ sendHttpPostReq(api_access_check, "cardUid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addCard > 0){ sendHttpPostReq(api_card_add, "uid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addAccess > 0){ sendHttpPostReq(api_access_add, "cardUid", rfidCard.c_str(), "doorName", doorName); }
   }
 
   mqtt.loop();
@@ -134,4 +134,32 @@ String readRfidCard() {
     card.concat(String(mfrc522.uid.uidByte[i], HEX));
   }
   return card;
+}
+
+void sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2) {
+  client.begin(apiServer, apiPort, uri);
+
+  client.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+  char postData[100];
+  strcpy(postData, key1);
+  strcat(postData, "=");
+  strcat(postData, value1);
+  strcat(postData, "&");
+  strcat(postData, key2);
+  strcat(postData, "=");
+  strcat(postData, value2);
+
+
+  int httpResponseCode = client.POST(postData);
+
+  // if (httpResponseCode > 0) {
+  //   Serial.print("HTTP Response code: ");
+  //   Serial.println(httpResponseCode);
+  //   String response = client.getString();
+  //   Serial.println(response);
+  // } else {
+  //   Serial.print("Error code: ");
+  //   Serial.println(httpResponseCode);
+  // }
 }
