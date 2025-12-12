@@ -33,7 +33,13 @@ const char *mqtt_user       = "user";
 const char *mqtt_password   = "Patate123";
 const char *mqtt_door_open  = "DoorSystem/door/open";
 
-MyRfid rfid(SS_PIN, RST_PIN);
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+
+String rfidCard = "";
+
+String readRfidCard();
+
+//MyRfid rfid(SS_PIN, RST_PIN);
 MyWiFi wifi;
 MyHttp http(apiServer, apiPort);
 MyMqtt mqtt(mqttServer, mqttPort, mqtt_id, "", "", doorName);
@@ -50,7 +56,8 @@ void setup(){
   pinMode(LED_RED_PIN, OUTPUT);
   digitalWrite(LED_RED_PIN, HIGH);
   
-  rfid.setup();
+  SPI.begin();
+  mfrc522.PCD_Init();
   delay(100);
 
   if( !wifi.connectToWiFi(ssid, password)){
@@ -74,14 +81,14 @@ void setup(){
 void loop(){
   mqtt.refresh();
 
-  if (rfid.isNewCardPresent()) {
-    rfid.readCardSerial();
+  if (mfrc522.PICC_IsNewCardPresent()) {
+    rfidCard = readRfidCard();
     Serial.print("UID tag: ");
-    Serial.println(rfid.card);
+    Serial.println(rfidCard);
     
-    if(mqtt.addCard==0 & mqtt.addAccess==0){ http.sendPostReq(api_access_check, "cardUid", rfid.card.c_str(), "doorName", doorName); }
-    if(mqtt.addCard > 0){ http.sendPostReq(api_card_add, "uid", rfid.card.c_str(), "doorName", doorName); }
-    if(mqtt.addAccess > 0){ http.sendPostReq(api_access_add, "cardUid", rfid.card.c_str(), "doorName", doorName); }
+    if(mqtt.addCard==0 & mqtt.addAccess==0){ http.sendPostReq(api_access_check, "cardUid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addCard > 0){ http.sendPostReq(api_card_add, "uid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addAccess > 0){ http.sendPostReq(api_access_add, "cardUid", rfidCard.c_str(), "doorName", doorName); }
   }
 
   mqtt.loop();
@@ -117,4 +124,14 @@ void loop(){
   }
 
   delay(250);
+}
+
+String readRfidCard() {
+  String card = "";
+  mfrc522.PICC_ReadCardSerial();
+  for (byte i = 0; i < mfrc522.uid.size; i++){
+    card.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+    card.concat(String(mfrc522.uid.uidByte[i], HEX));
+  }
+  return card;
 }
