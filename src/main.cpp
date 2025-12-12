@@ -5,8 +5,33 @@
 #include "myHttp.h"
 #include "myMqtt.h"
 #include "myRfid.h"
+#define RELAY_PIN 15 // pin for relay
+#define RST_PIN 39 // Reset pin
+#define SS_PIN 5  // Slave select pin
 
-#include "var.h"
+#define LED_GREEN_PIN 2
+#define LED_YELLOW_PIN 4
+#define LED_RED_PIN 17
+
+const char *ssid = "ssid";
+const char *password = "password";
+
+
+const char *doorName        = "C-089";
+const int   door_open_delay = 2000;
+
+const char *apiServer       = "api.servername.com";
+const int   apiPort         = 8080;
+const char *api_card_add    = "/api/card/add";
+const char *api_access_add  = "/api/access/add";
+const char *api_access_check= "/api/access/check";
+
+const char *mqttServer      = "mqtt.servername.com";
+const int   mqttPort        = 1883;
+const char *mqtt_id         = "ESP32";
+const char *mqtt_user       = "user";
+const char *mqtt_password   = "Patate123";
+const char *mqtt_door_open  = "DoorSystem/door/open";
 
 MyRfid rfid(SS_PIN, RST_PIN);
 MyWiFi wifi;
