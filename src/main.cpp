@@ -17,26 +17,26 @@ const char *ssid = "ssid";
 const char *password = "password";
 
 
-const char *doorName        = "C-089";
-const int   door_open_delay = 2000;
+const char *doorName        = "Server Room";
+const int   doorOpenFor = 2000;
 
-const char *apiServer       = "api.servername.com";
+const char *apiServerName   = "api.servername.com";
 const int   apiPort         = 8080;
-const char *api_card_add    = "/api/card/add";
-const char *api_access_add  = "/api/access/add";
-const char *api_access_check= "/api/access/check";
+const char *apiPathCardAdd    = "/api/card/add";
+const char *apiPathAccessAdd  = "/api/access/add";
+const char *apiPathAccessCheck= "/api/access/check";
 
 const char *mqttServer      = "mqtt.servername.com";
 const int   mqttPort        = 1883;
-const char *mqtt_id         = "ESP32";
-const char *mqtt_user       = "user";
-const char *mqtt_password   = "Patate123";
-const char *mqtt_door_open  = "DoorSystem/door/open";
-const char *mqtt_card_add   = "Doorsystem/card/add";
-const char *mqtt_access_add = "Doorsystem/access/add";
+const char *mqttId         = "ESP32";
+const char *mqttUser       = "user";
+const char *mqttPassword   = "Patate123";
+const char *mqttDoorOpen  = "DoorSystem/door/open";
+const char *mqttCardAdd   = "Doorsystem/card/add";
+const char *mqttAccessAdd = "Doorsystem/access/add";
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
-HTTPClient client;
+HTTPClient httpClient;
 
 String rfidCard = "";
 
@@ -45,7 +45,7 @@ void sendHttpPostReq(const char* uri, const char* key1, const char* value1, cons
 
 //MyRfid rfid(SS_PIN, RST_PIN);
 MyWiFi wifi;
-MyMqtt mqtt(mqttServer, mqttPort, mqtt_id, "", "", doorName);
+MyMqtt mqtt(mqttServer, mqttPort, mqttId, "", "", doorName);
 
 void setup(){
   Serial.begin(115200);
@@ -68,10 +68,10 @@ void setup(){
   }
   delay(100);
 
-  mqtt.mqttSubOpen = mqtt_door_open;
-  mqtt.mqttSubAddCard = mqtt_card_add;
+  mqtt.mqttSubOpen = mqttDoorOpen;
+  mqtt.mqttSubAddCard = mqttCardAdd;
    
-  mqtt.mqttSubAddAccess = mqtt_access_add;
+  mqtt.mqttSubAddAccess = mqttAccessAdd;
   mqtt.setup();
 
   while (!Serial)
@@ -89,9 +89,9 @@ void loop(){
     Serial.print("UID tag: ");
     Serial.println(rfidCard);
     
-    if(mqtt.addCard==0 & mqtt.addAccess==0){ sendHttpPostReq(api_access_check, "cardUid", rfidCard.c_str(), "doorName", doorName); }
-    if(mqtt.addCard > 0){ sendHttpPostReq(api_card_add, "uid", rfidCard.c_str(), "doorName", doorName); }
-    if(mqtt.addAccess > 0){ sendHttpPostReq(api_access_add, "cardUid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addCard==0 & mqtt.addAccess==0){ sendHttpPostReq(apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addCard > 0){ sendHttpPostReq(apiPathCardAdd, "uid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addAccess > 0){ sendHttpPostReq(apiPathAccessAdd, "cardUid", rfidCard.c_str(), "doorName", doorName); }
   }
 
   mqtt.loop();
@@ -140,9 +140,9 @@ String readRfidCard() {
 }
 
 void sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2) {
-  client.begin(apiServer, apiPort, uri);
+  httpClient.begin(apiServerName, apiPort, uri);
 
-  client.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  httpClient.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
   char postData[100];
   strcpy(postData, key1);
@@ -154,12 +154,12 @@ void sendHttpPostReq(const char* uri, const char* key1, const char* value1, cons
   strcat(postData, value2);
 
 
-  int httpResponseCode = client.POST(postData);
+  int httpResponseCode = httpClient.POST(postData);
 
   // if (httpResponseCode > 0) {
   //   Serial.print("HTTP Response code: ");
   //   Serial.println(httpResponseCode);
-  //   String response = client.getString();
+  //   String response = httpClient.getString();
   //   Serial.println(response);
   // } else {
   //   Serial.print("Error code: ");
