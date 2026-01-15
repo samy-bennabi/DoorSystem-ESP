@@ -1,4 +1,5 @@
 Enhancements:
+  - Add a README.md asap.
   - Debloat.
   - Currently communicates in both HTTP requests and MQTT, standardise to just one.
 
