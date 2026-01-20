@@ -1,49 +1,78 @@
+#include <Arduino.h>
 #include <SPI.h>
 #include <MFRC522.h>
+#include <HTTPClient.h>
 
 #include "myWiFi.h"
-#include "myHttp.h"
 #include "myMqtt.h"
-#include "myRfid.h"
+#define RELAY_PIN 15 // pin for relay
+#define RST_PIN 39 // Reset pin
+#define SS_PIN 5  // Slave select pin
 
-#include "var.h"
+#define LED_GREEN_PIN 2
+#define LED_YELLOW_PIN 4
+#define LED_RED_PIN 17
 
-//__________________________________________________________________________________________________________
+const char *ssid = "ssid";
+const char *password = "password";
 
-// my classes
-// Create all instances.
-MyRfid rfid(SS_PIN, RST_PIN);
+
+const char *doorName        = "Server Room";
+const int   doorOpenFor = 2000;
+
+const char *apiServerName   = "api.servername.com";
+const int   apiPort         = 8080;
+const char *apiPathCardAdd    = "/api/card/add";
+const char *apiPathAccessAdd  = "/api/access/add";
+const char *apiPathAccessCheck= "/api/access/check";
+
+const char *mqttServer      = "mqtt.servername.com";
+const int   mqttPort        = 1883;
+const char *mqttId         = "ESP32";
+const char *mqttUser       = "user";
+const char *mqttPassword   = "Patate123";
+const char *mqttDoorOpen  = "DoorSystem/door/open";
+const char *mqttCardAdd   = "Doorsystem/card/add";
+const char *mqttAccessAdd = "Doorsystem/access/add";
+
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+HTTPClient httpClient;
+
+String rfidCard = "";
+
+String readRfidCard();
+void sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2);
+
+//MyRfid rfid(SS_PIN, RST_PIN);
 MyWiFi wifi;
-MyHttp http(apiServer, apiPort);
-MyMqtt mqtt(mqttServer, mqttPort, mqtt_id, mqtt_user, mqtt_password, doorName);
+MyMqtt mqtt(mqttServer, mqttPort, mqttId, "", "", doorName);
 
-/**
- * Initialize.
- */
 void setup(){
-  Serial.begin(115200); // Initialize serial communications with the PC
+  Serial.begin(115200);
   
-  pinMode(RELAY_PIN, OUTPUT);// pin setup for relay
-  digitalWrite(RELAY_PIN, LOW); // make sure the relay is off
-  pinMode(LED_GREEN_PIN, OUTPUT);// pin setup for led
-  digitalWrite(LED_GREEN_PIN, LOW); // make sure the led is off
-  pinMode(LED_YELLOW_PIN, OUTPUT);// pin setup for led
-  digitalWrite(LED_YELLOW_PIN, LOW); // make sure the led is off
-  pinMode(LED_RED_PIN, OUTPUT);// pin setup for led
-  digitalWrite(LED_RED_PIN, HIGH); // make sure the led is on
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
+  pinMode(LED_GREEN_PIN, OUTPUT);
+  digitalWrite(LED_GREEN_PIN, LOW);
+  pinMode(LED_YELLOW_PIN, OUTPUT);
+  digitalWrite(LED_YELLOW_PIN, LOW);
+  pinMode(LED_RED_PIN, OUTPUT);
+  digitalWrite(LED_RED_PIN, HIGH);
   
-  rfid.setup(); // Initialize RFID-RC522 card reader.
+  SPI.begin();
+  mfrc522.PCD_Init();
   delay(100);
 
-  // wifi connection
   if( !wifi.connectToWiFi(ssid, password)){
     wifi.startAPMode("ESP32", "Patate123");
   }
   delay(100);
 
-  mqtt.mqttSubAccess = mqtt_sub_access;
-  mqtt.mqttSubAdd = mqtt_sub_add;
-  mqtt.setup();// mqtt connection
+  mqtt.mqttSubOpen = mqttDoorOpen;
+  mqtt.mqttSubAddCard = mqttCardAdd;
+   
+  mqtt.mqttSubAddAccess = mqttAccessAdd;
+  mqtt.setup();
 
   while (!Serial)
     ; // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4)
@@ -52,64 +81,88 @@ void setup(){
 }
 
 
-/**
- * Main loop.
- */
 void loop(){
-  mqtt.refresh();  //check mqtt and reconnect if disconnected
+  mqtt.refresh();
 
-  if (rfid.isNewCardPresent()) {
-    rfid.readCardSerial();
+  if (mfrc522.PICC_IsNewCardPresent()) {
+    rfidCard = readRfidCard();
     Serial.print("UID tag: ");
-    Serial.println(rfid.card);
+    Serial.println(rfidCard);
     
-    // http request to add card and door authorisation if add timout hasen't run out yet
-    if (mqtt.add > 0){ http.sendPostReq(api_card_add, "cardUid", rfid.card.c_str(), "doorName", doorName); }
-    // http request to check if card is authorized
-    else{http.sendPostReq(api_card_check, "cardUid", rfid.card.c_str(), "doorName", doorName); }
-    //mqtt.publish(mqtt_pub_check, rfid.card.c_str());
+    if(mqtt.addCard==0 & mqtt.addAccess==0){ sendHttpPostReq(apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addCard > 0){ sendHttpPostReq(apiPathCardAdd, "uid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addAccess > 0){ sendHttpPostReq(apiPathAccessAdd, "cardUid", rfidCard.c_str(), "doorName", doorName); }
   }
 
-  mqtt.loop(); // loop mqtt client to check for incoming messages
+  mqtt.loop();
   
-  // opens door if card is authorized
-  if (mqtt.auth) {
-    digitalWrite(RELAY_PIN, HIGH);  // open door
+  if (mqtt.open) {
+    digitalWrite(RELAY_PIN, HIGH);
     digitalWrite(LED_GREEN_PIN, HIGH);
     digitalWrite(LED_RED_PIN, LOW);
-    delay(2000);                    // wait 2 seconds
-    digitalWrite(RELAY_PIN, LOW);   // close door
+    delay(2000);
+    digitalWrite(RELAY_PIN, LOW);
     digitalWrite(LED_GREEN_PIN, LOW);
     digitalWrite(LED_RED_PIN, HIGH);
-    mqtt.auth=0;                    // reset auth
+    mqtt.open=0;
   }
 
   
-  if(mqtt.add > 0){
-    mqtt.add --;
+  if(mqtt.addCard > 0){
+    mqtt.addCard --;
     digitalWrite(LED_YELLOW_PIN, HIGH);
-    Serial.print(mqtt.add);
+    Serial.print(mqtt.addCard);
     Serial.println(" seconds remaining, Next card will be added .... ");
     delay (250);
     digitalWrite(LED_YELLOW_PIN, LOW);
   }
+
+  if(mqtt.addAccess > 0){
+    mqtt.addAccess --;
+    digitalWrite(LED_YELLOW_PIN, HIGH);
+    Serial.print(mqtt.addAccess);
+    Serial.println(" seconds remaining, Next card will be authorised .... ");
+    delay (250);
+    digitalWrite(LED_YELLOW_PIN, LOW);
+  }
+
   delay(250);
 }
 
-// callback to be executed when the subscribed-to topic has a pub
-/*void callback(char *topic, byte *payload, unsigned int length){
-  Serial.print("Message received from ");
-  Serial.print(topic);
-  Serial.print(" ");
-  for (int i = 0; i < length; i++) { acsLvl = (payload[i] - '0'); }
-  Serial.print(acsLvl);
-
-  // gestion des etats selon la reponse de l'api
-  switch (acsLvl) {
-  case 1: auth=1; break;
-  case 2: add=20; break;
-    default: break;
+String readRfidCard() {
+  String card = "";
+  mfrc522.PICC_ReadCardSerial();
+  for (byte i = 0; i < mfrc522.uid.size; i++){
+    card.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+    card.concat(String(mfrc522.uid.uidByte[i], HEX));
   }
+  return card;
+}
 
-  Serial.println();
-}*/
+void sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2) {
+  httpClient.begin(apiServerName, apiPort, uri);
+
+  httpClient.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+  char postData[100];
+  strcpy(postData, key1);
+  strcat(postData, "=");
+  strcat(postData, value1);
+  strcat(postData, "&");
+  strcat(postData, key2);
+  strcat(postData, "=");
+  strcat(postData, value2);
+
+
+  int httpResponseCode = httpClient.POST(postData);
+
+  // if (httpResponseCode > 0) {
+  //   Serial.print("HTTP Response code: ");
+  //   Serial.println(httpResponseCode);
+  //   String response = httpClient.getString();
+  //   Serial.println(response);
+  // } else {
+  //   Serial.print("Error code: ");
+  //   Serial.println(httpResponseCode);
+  // }
+}
