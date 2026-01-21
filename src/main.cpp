@@ -169,9 +169,9 @@ void startAPMode(const char* ssid, const char* password) {
   Serial.print("Access point IP address: ");
   Serial.println(WiFi.softAPIP());
 
-  server.begin();
+  wifiServer.begin();
   while (1) {
-    WiFiClient client = server.available();
+    WiFiClient client = wifiServer.available();
     if (client) {
       serveWebPage(client);
     }
@@ -211,7 +211,7 @@ void serveWebPage(WiFiClient wifiClient) {
 
     WiFi.disconnect();
     delay(1000);
-    WiFi.begin(ssid.c_str(), password.c_str());
+    connectToWiFi(ssid.c_str(), password.c_str());
   }
 }
 
