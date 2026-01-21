@@ -3,8 +3,6 @@
 #include <MFRC522.h>
 #include <HTTPClient.h>
 
-#include "myWiFi.h"
-#include "myMqtt.h"
 #define RELAY_PIN 15 // pin for relay
 #define RST_PIN 39 // Reset pin
 #define SS_PIN 5  // Slave select pin
@@ -37,14 +35,17 @@ const char *mqttAccessAdd = "Doorsystem/access/add";
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 HTTPClient httpClient;
+WiFiServer wifiServer;
 
 String rfidCard = "";
-
 String readRfidCard();
+bool connectToWiFi(const char* ssid, const char* password);
+void startAPMode(const char* ssid, const char* password);
+void serveWebPage(WiFiClient wifiClient);
 void sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2);
 
 //MyRfid rfid(SS_PIN, RST_PIN);
-MyWiFi wifi;
+//MyWiFi wifi;
 MyMqtt mqtt(mqttServer, mqttPort, mqttId, "", "", doorName);
 
 void setup(){
@@ -63,8 +64,8 @@ void setup(){
   mfrc522.PCD_Init();
   delay(100);
 
-  if( !wifi.connectToWiFi(ssid, password)){
-    wifi.startAPMode("ESP32", "Patate123");
+  if( !connectToWiFi(ssid, password)){
+    startAPMode("ESP32", "Patate123");
   }
   delay(100);
 
@@ -137,6 +138,81 @@ String readRfidCard() {
     card.concat(String(mfrc522.uid.uidByte[i], HEX));
   }
   return card;
+}
+
+bool connectToWiFi(const char* ssid, const char* password) {
+  WiFi.mode(WIFI_STA);  // The WiFi is in station mode
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi ");
+  Serial.print(ssid);
+
+  unsigned long startTime = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startTime < 5000) {
+    Serial.print(".");
+    delay(1000);
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Connected!");
+    return true;
+  } else {
+    Serial.println("Connection failed.");
+    return false;
+  }
+}
+
+void startAPMode(const char* ssid, const char* password) {
+  WiFi.mode(WIFI_AP); // The WiFi is in access point mode
+  WiFi.softAP(apSSID, apPassword);
+  Serial.print("Access point mode started with SSID and password:");
+  Serial.println(apSSID + String(" ") + apPassword);
+  Serial.print("Access point IP address: ");
+  Serial.println(WiFi.softAPIP());
+
+  server.begin();
+  while (1) {
+    WiFiClient client = server.available();
+    if (client) {
+      serveWebPage(client);
+    }
+  }
+}
+
+void serveWebPage(WiFiClient wifiClient) {
+  String request = wifiClient.readStringUntil('\r');
+  //wifiClient.flush();
+
+  wifiClient.println("HTTP/1.1 200 OK");
+  wifiClient.println("Content-Type: text/html");
+  wifiClient.println("");
+  wifiClient.println("<!DOCTYPE html><html>");
+  wifiClient.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>WiFi Configuration</title></head>");
+  wifiClient.println("<body><h1>Configure WiFi</h1>");
+  wifiClient.println("<form method=\"get\" action=\"/config\">");
+  wifiClient.println("<label>SSID:</label>");
+  wifiClient.println("<input type=\"text\" name=\"ssid\"><br>");
+  wifiClient.println("<label>Password:</label>");
+  wifiClient.println("<input type=\"password\" name=\"password\"><br>");
+  wifiClient.println("<input type=\"submit\" value=\"Submit\">");
+  wifiClient.println("</form>");
+  wifiClient.println("</body></html>");
+
+  if (request.indexOf("/config") != -1) {
+    int ssidStart = request.indexOf("ssid=") + 5;
+    int ssidEnd = request.indexOf("&password=");
+    int passwordStart = request.indexOf("password=") + 9;
+    int passwordEnd = request.indexOf("HTTP/1.1") - 1;
+
+    String ssid = request.substring(ssidStart, ssidEnd);
+    String password = request.substring(passwordStart, passwordEnd);
+
+    Serial.println("SSID: " + ssid);
+    Serial.println("Password: " + password);
+
+    WiFi.disconnect();
+    delay(1000);
+    WiFi.begin(ssid.c_str(), password.c_str());
+  }
 }
 
 void sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2) {
