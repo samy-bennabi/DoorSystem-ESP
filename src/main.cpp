@@ -14,7 +14,6 @@
 const char *ssid = "ssid";
 const char *password = "password";
 
-
 const char *doorName        = "Server Room";
 const int   doorOpenFor = 2000;
 
@@ -71,14 +70,13 @@ void setup(){
 
   mqtt.mqttSubOpen = mqttDoorOpen;
   mqtt.mqttSubAddCard = mqttCardAdd;
-   
   mqtt.mqttSubAddAccess = mqttAccessAdd;
   mqtt.setup();
 
   while (!Serial)
-    ; // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4)
+    ; // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4) | idk if I should be keeping this in, gotta check
 
-  Serial.println("Lessgo scan...");
+  Serial.println("Setup finished successfuly.");
 }
 
 
@@ -90,6 +88,7 @@ void loop(){
     Serial.print("UID tag: ");
     Serial.println(rfidCard);
 
+    /* this block is incompatible with the current workings, will be useful later on.
     if(sendHttpPostReq(apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName)==200){
       digitalWrite(RELAY_PIN, HIGH);
       digitalWrite(LED_GREEN_PIN, HIGH);
@@ -99,8 +98,9 @@ void loop(){
       digitalWrite(LED_GREEN_PIN, LOW);
       digitalWrite(LED_RED_PIN, HIGH);
     }
+    */
 
-    //if(mqtt.addCard==0 & mqtt.addAccess==0){ sendHttpPostReq(apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addCard==0 & mqtt.addAccess==0){ sendHttpPostReq(apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName); }
     if(mqtt.addCard > 0){ sendHttpPostReq(apiPathCardAdd, "uid", rfidCard.c_str(), "doorName", doorName); }
     if(mqtt.addAccess > 0){ sendHttpPostReq(apiPathAccessAdd, "cardUid", rfidCard.c_str(), "doorName", doorName); }
   }
@@ -180,11 +180,10 @@ void startAPMode(const char* ssid, const char* password) {
   Serial.println(WiFi.softAPIP());
 
   wifiServer.begin();
+
   while (1) {
     WiFiClient client = wifiServer.available();
-    if (client) {
-      serveWebPage(client);
-    }
+    if (client) { serveWebPage(client); }
   }
 }
 
@@ -227,7 +226,6 @@ void serveWebPage(WiFiClient wifiClient) {
 
 int sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2) {
   httpClient.begin(apiServerName, apiPort, uri);
-
   httpClient.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
   char postData[100];
@@ -239,17 +237,6 @@ int sendHttpPostReq(const char* uri, const char* key1, const char* value1, const
   strcat(postData, "=");
   strcat(postData, value2);
 
-
   int httpResponseCode = httpClient.POST(postData);
   return httpResponseCode;
-
-  // if (httpResponseCode > 0) {
-  //   Serial.print("HTTP Response code: ");
-  //   Serial.println(httpResponseCode);
-  //   String response = httpClient.getString();
-  //   Serial.println(response);
-  // } else {
-  //   Serial.print("Error code: ");
-  //   Serial.println(httpResponseCode);
-  // }
 }
