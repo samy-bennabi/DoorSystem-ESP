@@ -42,7 +42,7 @@ String readRfidCard();
 bool connectToWiFi(const char* ssid, const char* password);
 void startAPMode(const char* ssid, const char* password);
 void serveWebPage(WiFiClient wifiClient);
-void sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2);
+int sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2);
 
 //MyRfid rfid(SS_PIN, RST_PIN);
 //MyWiFi wifi;
@@ -89,8 +89,18 @@ void loop(){
     rfidCard = readRfidCard();
     Serial.print("UID tag: ");
     Serial.println(rfidCard);
-    
-    if(mqtt.addCard==0 & mqtt.addAccess==0){ sendHttpPostReq(apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName); }
+
+    if(sendHttpPostReq(apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName)==200){
+      digitalWrite(RELAY_PIN, HIGH);
+      digitalWrite(LED_GREEN_PIN, HIGH);
+      digitalWrite(LED_RED_PIN, LOW);
+      delay(2000);
+      digitalWrite(RELAY_PIN, LOW);
+      digitalWrite(LED_GREEN_PIN, LOW);
+      digitalWrite(LED_RED_PIN, HIGH);
+    }
+
+    //if(mqtt.addCard==0 & mqtt.addAccess==0){ sendHttpPostReq(apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName); }
     if(mqtt.addCard > 0){ sendHttpPostReq(apiPathCardAdd, "uid", rfidCard.c_str(), "doorName", doorName); }
     if(mqtt.addAccess > 0){ sendHttpPostReq(apiPathAccessAdd, "cardUid", rfidCard.c_str(), "doorName", doorName); }
   }
@@ -215,7 +225,7 @@ void serveWebPage(WiFiClient wifiClient) {
   }
 }
 
-void sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2) {
+int sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2) {
   httpClient.begin(apiServerName, apiPort, uri);
 
   httpClient.addHeader("Content-Type", "application/x-www-form-urlencoded");
@@ -231,6 +241,7 @@ void sendHttpPostReq(const char* uri, const char* key1, const char* value1, cons
 
 
   int httpResponseCode = httpClient.POST(postData);
+  return httpResponseCode;
 
   // if (httpResponseCode > 0) {
   //   Serial.print("HTTP Response code: ");
