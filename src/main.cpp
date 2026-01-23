@@ -3,6 +3,8 @@
 #include <MFRC522.h>
 #include <HTTPClient.h>
 
+#include "myMqtt.h"
+
 #define RELAY_PIN 15 // pin for relay
 #define RST_PIN 39 // Reset pin
 #define SS_PIN 5  // Slave select pin
@@ -173,9 +175,9 @@ bool connectToWiFi(const char* ssid, const char* password) {
 
 void startAPMode(const char* ssid, const char* password) {
   WiFi.mode(WIFI_AP); // The WiFi is in access point mode
-  WiFi.softAP(apSSID, apPassword);
+  WiFi.softAP(ssid, password);
   Serial.print("Access point mode started with SSID and password:");
-  Serial.println(apSSID + String(" ") + apPassword);
+  Serial.println(ssid + String(" ") + password);
   Serial.print("Access point IP address: ");
   Serial.println(WiFi.softAPIP());
 
