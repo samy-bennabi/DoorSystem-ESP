@@ -19,8 +19,6 @@ const int   doorOpenFor = 2000;
 
 const char *apiServerName   = "api.servername.com";
 const int   apiPort         = 8080;
-const char *apiPathCardAdd    = "/api/card/add";
-const char *apiPathAccessAdd  = "/api/access/add";
 const char *apiPathAccessCheck= "/api/access/check";
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
