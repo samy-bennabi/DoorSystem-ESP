@@ -5,9 +5,9 @@
 
 #include "myMqtt.h"
 
-#define RELAY_PIN 15 // pin for relay
-#define RST_PIN 39 // Reset pin
-#define SS_PIN 5  // Slave select pin
+#define RELAY_PIN 15
+#define RST_PIN 39
+#define SS_PIN 5
 
 #define LED_GREEN_PIN 2
 #define LED_YELLOW_PIN 4
@@ -119,7 +119,6 @@ void loop(){
     digitalWrite(LED_RED_PIN, HIGH);
     mqtt.open=0;
   }
-
   
   if(mqtt.addCard > 0){
     mqtt.addCard --;
