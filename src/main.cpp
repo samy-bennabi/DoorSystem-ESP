@@ -3,8 +3,6 @@
 #include <MFRC522.h>
 #include <HTTPClient.h>
 
-#include "myMqtt.h"
-
 #define RELAY_PIN 15
 #define RST_PIN 39
 #define SS_PIN 5
@@ -25,15 +23,6 @@ const char *apiPathCardAdd    = "/api/card/add";
 const char *apiPathAccessAdd  = "/api/access/add";
 const char *apiPathAccessCheck= "/api/access/check";
 
-const char *mqttServer      = "mqtt.servername.com";
-const int   mqttPort        = 1883;
-const char *mqttId         = "ESP32";
-const char *mqttUser       = "user";
-const char *mqttPassword   = "Patate123";
-const char *mqttDoorOpen  = "DoorSystem/door/open";
-const char *mqttCardAdd   = "Doorsystem/card/add";
-const char *mqttAccessAdd = "Doorsystem/access/add";
-
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 HTTPClient theHttpClient;
 WiFiServer theWifiServer;
@@ -44,8 +33,6 @@ bool connectToWiFi(const char* ssid, const char* password);
 void startAPMode(WiFiServer * wifiserver, const char* ssid, const char* password);
 void serveWebPage(WiFiClient wifiClient);
 int sendHttpPostReq(HTTPClient * httpClient ,const char* uri, const char* key1, const char* value1, const char* key2, const char* value2);
-
-MyMqtt mqtt(mqttServer, mqttPort, mqttId, "", "", doorName);
 
 void setup(){
   Serial.begin(115200);
@@ -68,11 +55,6 @@ void setup(){
   }
   delay(100);
 
-  mqtt.mqttSubOpen = mqttDoorOpen;
-  mqtt.mqttSubAddCard = mqttCardAdd;
-  mqtt.mqttSubAddAccess = mqttAccessAdd;
-  mqtt.setup();
-
   while (!Serial)
     ; // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4) | idk if I should be keeping this in, gotta check
 
@@ -81,49 +63,21 @@ void setup(){
 
 
 void loop(){
-  mqtt.refresh();
-
   if (mfrc522.PICC_IsNewCardPresent()) {
     rfidCard = readRfidCard();
     Serial.print("UID tag: ");
     Serial.println(rfidCard);
 
-    if(mqtt.addCard==0 & mqtt.addAccess==0){ sendHttpPostReq(&theHttpClient, apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName); }
-    if(mqtt.addCard > 0){ sendHttpPostReq(&theHttpClient, apiPathCardAdd, "uid", rfidCard.c_str(), "doorName", doorName); }
-    if(mqtt.addAccess > 0){ sendHttpPostReq(&theHttpClient, apiPathAccessAdd, "cardUid", rfidCard.c_str(), "doorName", doorName); }
+    if(sendHttpPostReq(&theHttpClient, apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName)==200){
+      digitalWrite(RELAY_PIN, HIGH);
+      digitalWrite(LED_GREEN_PIN, HIGH);
+      digitalWrite(LED_RED_PIN, LOW);
+      delay(2000);
+      digitalWrite(RELAY_PIN, LOW);
+      digitalWrite(LED_GREEN_PIN, LOW);
+      digitalWrite(LED_RED_PIN, HIGH);
+    }
   }
-
-  mqtt.loop();
-  
-  if (mqtt.open) {
-    digitalWrite(RELAY_PIN, HIGH);
-    digitalWrite(LED_GREEN_PIN, HIGH);
-    digitalWrite(LED_RED_PIN, LOW);
-    delay(2000);
-    digitalWrite(RELAY_PIN, LOW);
-    digitalWrite(LED_GREEN_PIN, LOW);
-    digitalWrite(LED_RED_PIN, HIGH);
-    mqtt.open=0;
-  }
-  
-  if(mqtt.addCard > 0){
-    mqtt.addCard --;
-    digitalWrite(LED_YELLOW_PIN, HIGH);
-    Serial.print(mqtt.addCard);
-    Serial.println(" seconds remaining, Next card will be added .... ");
-    delay (250);
-    digitalWrite(LED_YELLOW_PIN, LOW);
-  }
-
-  if(mqtt.addAccess > 0){
-    mqtt.addAccess --;
-    digitalWrite(LED_YELLOW_PIN, HIGH);
-    Serial.print(mqtt.addAccess);
-    Serial.println(" seconds remaining, Next card will be authorised .... ");
-    delay (250);
-    digitalWrite(LED_YELLOW_PIN, LOW);
-  }
-
   delay(250);
 }
 
