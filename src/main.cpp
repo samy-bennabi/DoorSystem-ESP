@@ -16,7 +16,7 @@
 const char *ssid = "ssid";
 const char *password = "password";
 
-const char *doorName        = "Server Room";
+const char *doorName        = "backdoor";
 const int   doorOpenFor = 2000;
 
 const char *apiServerName   = "api.servername.com";
@@ -35,18 +35,16 @@ const char *mqttCardAdd   = "Doorsystem/card/add";
 const char *mqttAccessAdd = "Doorsystem/access/add";
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
-HTTPClient httpClient;
-WiFiServer wifiServer;
+HTTPClient theHttpClient;
+WiFiServer theWifiServer;
 
 String rfidCard = "";
 String readRfidCard();
 bool connectToWiFi(const char* ssid, const char* password);
-void startAPMode(const char* ssid, const char* password);
+void startAPMode(WiFiServer * wifiserver, const char* ssid, const char* password);
 void serveWebPage(WiFiClient wifiClient);
-int sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2);
+int sendHttpPostReq(HTTPClient * httpClient ,const char* uri, const char* key1, const char* value1, const char* key2, const char* value2);
 
-//MyRfid rfid(SS_PIN, RST_PIN);
-//MyWiFi wifi;
 MyMqtt mqtt(mqttServer, mqttPort, mqttId, "", "", doorName);
 
 void setup(){
@@ -66,7 +64,7 @@ void setup(){
   delay(100);
 
   if( !connectToWiFi(ssid, password)){
-    startAPMode("ESP32", "Patate123");
+    startAPMode(&theWifiServer, "ESP32", "Patate123");
   }
   delay(100);
 
@@ -90,21 +88,9 @@ void loop(){
     Serial.print("UID tag: ");
     Serial.println(rfidCard);
 
-    /* this block is incompatible with the current workings, will be useful later on.
-    if(sendHttpPostReq(apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName)==200){
-      digitalWrite(RELAY_PIN, HIGH);
-      digitalWrite(LED_GREEN_PIN, HIGH);
-      digitalWrite(LED_RED_PIN, LOW);
-      delay(2000);
-      digitalWrite(RELAY_PIN, LOW);
-      digitalWrite(LED_GREEN_PIN, LOW);
-      digitalWrite(LED_RED_PIN, HIGH);
-    }
-    */
-
-    if(mqtt.addCard==0 & mqtt.addAccess==0){ sendHttpPostReq(apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName); }
-    if(mqtt.addCard > 0){ sendHttpPostReq(apiPathCardAdd, "uid", rfidCard.c_str(), "doorName", doorName); }
-    if(mqtt.addAccess > 0){ sendHttpPostReq(apiPathAccessAdd, "cardUid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addCard==0 & mqtt.addAccess==0){ sendHttpPostReq(&theHttpClient, apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addCard > 0){ sendHttpPostReq(&theHttpClient, apiPathCardAdd, "uid", rfidCard.c_str(), "doorName", doorName); }
+    if(mqtt.addAccess > 0){ sendHttpPostReq(&theHttpClient, apiPathAccessAdd, "cardUid", rfidCard.c_str(), "doorName", doorName); }
   }
 
   mqtt.loop();
@@ -152,7 +138,7 @@ String readRfidCard() {
 }
 
 bool connectToWiFi(const char* ssid, const char* password) {
-  WiFi.mode(WIFI_STA);  // The WiFi is in station mode
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi ");
   Serial.print(ssid);
@@ -172,18 +158,18 @@ bool connectToWiFi(const char* ssid, const char* password) {
   }
 }
 
-void startAPMode(const char* ssid, const char* password) {
-  WiFi.mode(WIFI_AP); // The WiFi is in access point mode
+void startAPMode(WiFiServer * wifiServer, const char* ssid, const char* password) {
+  WiFi.mode(WIFI_AP);
   WiFi.softAP(ssid, password);
   Serial.print("Access point mode started with SSID and password:");
   Serial.println(ssid + String(" ") + password);
   Serial.print("Access point IP address: ");
   Serial.println(WiFi.softAPIP());
 
-  wifiServer.begin();
+  wifiServer->begin();
 
   while (1) {
-    WiFiClient client = wifiServer.available();
+    WiFiClient client = wifiServer->available();
     if (client) { serveWebPage(client); }
   }
 }
@@ -225,9 +211,9 @@ void serveWebPage(WiFiClient wifiClient) {
   }
 }
 
-int sendHttpPostReq(const char* uri, const char* key1, const char* value1, const char* key2, const char* value2) {
-  httpClient.begin(apiServerName, apiPort, uri);
-  httpClient.addHeader("Content-Type", "application/x-www-form-urlencoded");
+int sendHttpPostReq(HTTPClient * httpClient ,const char* uri, const char* key1, const char* value1, const char* key2, const char* value2) {
+  httpClient->begin(apiServerName, apiPort, uri);
+  httpClient->addHeader("Content-Type", "application/x-www-form-urlencoded");
 
   char postData[100];
   strcpy(postData, key1);
@@ -238,6 +224,6 @@ int sendHttpPostReq(const char* uri, const char* key1, const char* value1, const
   strcat(postData, "=");
   strcat(postData, value2);
 
-  int httpResponseCode = httpClient.POST(postData);
+  int httpResponseCode = httpClient->POST(postData);
   return httpResponseCode;
 }
