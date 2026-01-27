@@ -1,6 +1,7 @@
 ## Enhancements:
 - [x] Add a README.md.
-- [ ] Populate the README.md.
+- [x] Populate the README.md.
+- [ ] Make a useful README.md.
 - [x] Debloat.
 - [x] Currently communicates in both HTTP requests and MQTT, standardise to just one (probably to HTTP and open the door or not based on the response code).
 - [ ] Add error handling and reporting (maybe with leds?).
