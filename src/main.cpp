@@ -7,9 +7,9 @@
 #define RST_PIN 39
 #define SS_PIN 5
 
-#define LED_GREEN_PIN 2
-#define LED_YELLOW_PIN 4
-#define LED_RED_PIN 17
+#define LED_PIN_GREEN 2
+#define LED_PIN_YELLOW 4
+#define LED_PIN_RED 17
 
 const char *ssid = "ssid";
 const char *password = "password";
@@ -29,7 +29,7 @@ String rfidCard = "";
 String readRfidCard();
 bool connectToWiFi(const char* ssid, const char* password);
 void startAPMode(WiFiServer * wifiserver, const char* ssid, const char* password);
-void serveWebPage(WiFiClient wifiClient);
+void serveWebPage(WiFiClient * wifiClient);
 int sendHttpPostReq(HTTPClient * httpClient ,const char* uri, const char* key1, const char* value1, const char* key2, const char* value2);
 
 void setup(){
@@ -37,12 +37,12 @@ void setup(){
   
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
-  pinMode(LED_GREEN_PIN, OUTPUT);
-  digitalWrite(LED_GREEN_PIN, LOW);
-  pinMode(LED_YELLOW_PIN, OUTPUT);
-  digitalWrite(LED_YELLOW_PIN, LOW);
-  pinMode(LED_RED_PIN, OUTPUT);
-  digitalWrite(LED_RED_PIN, HIGH);
+  pinMode(LED_PIN_GREEN, OUTPUT);
+  digitalWrite(LED_PIN_GREEN, LOW);
+  pinMode(LED_PIN_YELLOW, OUTPUT);
+  digitalWrite(LED_PIN_YELLOW, LOW);
+  pinMode(LED_PIN_RED, OUTPUT);
+  digitalWrite(LED_PIN_RED, HIGH);
   
   SPI.begin();
   mfrc522.PCD_Init();
@@ -68,12 +68,12 @@ void loop(){
 
     if(sendHttpPostReq(&theHttpClient, apiPathAccessCheck, "cardUid", rfidCard.c_str(), "doorName", doorName)==200){
       digitalWrite(RELAY_PIN, HIGH);
-      digitalWrite(LED_GREEN_PIN, HIGH);
-      digitalWrite(LED_RED_PIN, LOW);
+      digitalWrite(LED_PIN_GREEN, HIGH);
+      digitalWrite(LED_PIN_RED, LOW);
       delay(2000);
       digitalWrite(RELAY_PIN, LOW);
-      digitalWrite(LED_GREEN_PIN, LOW);
-      digitalWrite(LED_RED_PIN, HIGH);
+      digitalWrite(LED_PIN_GREEN, LOW);
+      digitalWrite(LED_PIN_RED, HIGH);
     }
   }
   delay(250);
@@ -122,28 +122,26 @@ void startAPMode(WiFiServer * wifiServer, const char* ssid, const char* password
 
   while (1) {
     WiFiClient client = wifiServer->available();
-    if (client) { serveWebPage(client); }
+    if (client) { serveWebPage(&client); }
   }
 }
 
-void serveWebPage(WiFiClient wifiClient) {
-  String request = wifiClient.readStringUntil('\r');
-  //wifiClient.flush();
-
-  wifiClient.println("HTTP/1.1 200 OK");
-  wifiClient.println("Content-Type: text/html");
-  wifiClient.println("");
-  wifiClient.println("<!DOCTYPE html><html>");
-  wifiClient.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>WiFi Configuration</title></head>");
-  wifiClient.println("<body><h1>Configure WiFi</h1>");
-  wifiClient.println("<form method=\"get\" action=\"/config\">");
-  wifiClient.println("<label>SSID:</label>");
-  wifiClient.println("<input type=\"text\" name=\"ssid\"><br>");
-  wifiClient.println("<label>Password:</label>");
-  wifiClient.println("<input type=\"password\" name=\"password\"><br>");
-  wifiClient.println("<input type=\"submit\" value=\"Submit\">");
-  wifiClient.println("</form>");
-  wifiClient.println("</body></html>");
+void serveWebPage(WiFiClient * wifiClient) {
+  String request = wifiClient->readStringUntil('\r');
+  wifiClient->println("HTTP/1.1 200 OK");
+  wifiClient->println("Content-Type: text/html");
+  wifiClient->println("");
+  wifiClient->println("<!DOCTYPE html><html>");
+  wifiClient->println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>WiFi Configuration</title></head>");
+  wifiClient->println("<body><h1>Configure WiFi</h1>");
+  wifiClient->println("<form method=\"get\" action=\"/config\">");
+  wifiClient->println("<label>SSID:</label>");
+  wifiClient->println("<input type=\"text\" name=\"ssid\"><br>");
+  wifiClient->println("<label>Password:</label>");
+  wifiClient->println("<input type=\"password\" name=\"password\"><br>");
+  wifiClient->println("<input type=\"submit\" value=\"Submit\">");
+  wifiClient->println("</form>");
+  wifiClient->println("</body></html>");
 
   if (request.indexOf("/config") != -1) {
     int ssidStart = request.indexOf("ssid=") + 5;
