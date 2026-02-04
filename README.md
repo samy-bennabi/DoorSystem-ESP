@@ -1,5 +1,5 @@
-# IoT lock thingy (didn't come up with a name yet)
-description goes here
+# NFC Door lock
+Microcontroller portion of a whole system to unlock doors electronically with NFC cards.
 
 ## Prerequisites
 - ESP32.
